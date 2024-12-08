@@ -1,32 +1,35 @@
 #### Script pour entrainer le XGBoost sur les données de revues et de produits Amazon
+#### LLM entrainé sur equal weights et XGB entrainé sur données normales
 options(scipen = 999) # empêcher notation scientifique
 library(tidyverse)
 library(xgboost)
 library(scales)
 
+source("xgboost/compute_metrics.R")
+
 ### Préparation des données ----------------------------------------------------
 
 ## Importer les données
-data_0_5000_raw <- read.csv("data/CCO_5000inference_train.csv")
-data_5000_10000_raw <- read.csv("data/NSL_5000_10000_inference_train.csv")
-data_10000_15000_raw <- read.csv("data/NSL_10000_15000_inference_train.csv")
-data_15000_20000_raw <- read.csv("data/NSL_15000_20000_inference_train.csv")
-data_full_raw <- bind_rows(
-  data_0_5000_raw, data_5000_10000_raw, 
-  data_10000_15000_raw, data_15000_20000_raw
-  )
+data_0_10000_llm_raw <- read.csv("data/CCO_0_10000_wtdllm_inference_train.csv")
+data_10000_15000_llm_raw <- read.csv("data/NSL_10000_15000_wtdllm_inference_train.csv")
+data_15000_20000_llm_raw <- read.csv("data/NSL_15000_20000_wtdllm_inference_train.csv")
+data_full_llm_raw <- bind_rows(
+  data_0_10000_llm_raw,  
+  data_10000_15000_llm_raw, 
+  data_15000_20000_llm_raw
+)
 
-#data_full_raw %>% count(rating)
+#data_full_llm_xgb_raw %>% count(rating)
 
 ## Filtrer les valeurs extremes/aberrantes
 # Couper rating_number à 25K
-#quantile(data_full_raw$rating_number, probs = c(0, 0.25, 0.5, 0.75, 0.9, 0.95, 0.97, 0.99, 0.999, 1))
+#quantile(data_full_llm_raw$rating_number, probs = c(0, 0.25, 0.5, 0.75, 0.9, 0.95, 0.97, 0.99, 0.999, 1))
 # Couper helpful_vote à 10
-#quantile(data_full_raw$helpful_vote, probs = c(0, 0.25, 0.5, 0.75, 0.9, 0.95, 0.97, 0.99, 0.999, 1))
+#quantile(data_full_llm_raw$helpful_vote, probs = c(0, 0.25, 0.5, 0.75, 0.9, 0.95, 0.97, 0.99, 0.999, 1))
 # Couper le prix à 500$
-#quantile(data_full_raw$price, probs = c(0, 0.25, 0.5, 0.75, 0.9, 0.95, 0.97, 0.99, 0.999, 1))
+#quantile(data_full_llm_raw$price, probs = c(0, 0.25, 0.5, 0.75, 0.9, 0.95, 0.97, 0.99, 0.999, 1))
 
-data_full <- data_full_raw %>% 
+data_full_llm <- data_full_llm_raw %>% 
   mutate(
     rating = rating-1, # ajustement pour algo xgboost
     predicted_llm_rating = predicted_llm_rating-1,
@@ -34,18 +37,18 @@ data_full <- data_full_raw %>%
   )
 
 ## Normaliser les variables
-data_normal_scaled <- data_full %>% 
+data_llm_scaled <- data_full_llm %>% 
   mutate(across(c(helpful_vote, average_rating, rating_number, price), ~rescale(.)))
 
 ## Train/Valid split
 set.seed(12345)
-val_ind <- sample(1:nrow(data_full), 2500, replace = F)
+val_ind <- sample(1:nrow(data_full_llm), 2500, replace = F)
 
-train_normal <- data_full[-val_ind, ]
-valid_normal <- data_full[val_ind, ]
+train_llm <- data_full_llm[-val_ind, ]
+valid_llm <- data_full_llm[val_ind, ]
 
-train_normal_scaled <- data_normal_scaled[-val_ind, ]
-valid_normal_scaled <- data_normal_scaled[val_ind, ]
+train_llm_scaled <- data_llm_scaled[-val_ind, ]
+valid_llm_scaled <- data_llm_scaled[val_ind, ]
 
 ## Sélection de variables
 #vars2keep_1 <- c("as_image", "helpful_vote", "verified_purchase", "main_category",
@@ -57,26 +60,27 @@ vars2keep_1 <- c("as_image", "helpful_vote", "verified_purchase", "main_category
 
 ## Données pour XGB
 # n = normal, s = scaled, w = weighted
-X_train_n_full <- train_normal %>% select(all_of(vars2keep_1))
-X_train_ns_full <- train_normal_scaled %>% select(all_of(vars2keep_1))
-y_train_n <- train_normal$rating
+X_train_llm_full <- train_llm %>% select(all_of(vars2keep_1))
+X_train_llm_s_full <- train_llm_scaled %>% select(all_of(vars2keep_1))
+y_train_llm <- train_llm$rating
 
-dmtrain_n_full <- xgb.DMatrix(data = data.matrix(X_train_n_full), label = y_train_n)
-dmtrain_ns_full <- xgb.DMatrix(data = data.matrix(X_train_ns_full), label = y_train_n)
+dmtrain_llm_full <- xgb.DMatrix(data = data.matrix(X_train_llm_full), label = y_train_llm)
+dmtrain_llm_s_full <- xgb.DMatrix(data = data.matrix(X_train_llm_s_full), label = y_train_llm)
 
 
-X_valid_n_full <- valid_normal %>% select(all_of(vars2keep_1))
-X_valid_ns_full <- valid_normal_scaled %>% select(all_of(vars2keep_1))
-y_valid_n <- valid_normal$rating
+X_valid_llm_full <- valid_llm %>% select(all_of(vars2keep_1))
+X_valid_llm_s_full <- valid_llm_scaled %>% select(all_of(vars2keep_1))
+y_valid_llm <- valid_llm$rating
 
-dmvalid_n_full <- xgb.DMatrix(data = data.matrix(X_valid_n_full), label = y_valid_n)
-dmvalid_ns_full <- xgb.DMatrix(data = data.matrix(X_valid_ns_full), label = y_valid_n)
+dmvalid_llm_full <- xgb.DMatrix(data = data.matrix(X_valid_llm_full), label = y_valid_llm)
+dmvalid_llm_s_full <- xgb.DMatrix(data = data.matrix(X_valid_llm_s_full), label = y_valid_llm)
 
 
 ### XGBoost --------------------------------------------------------------------
 # Test boboche
-xgb_n_s <- xgboost(
-  data = dmtrain_ns_full, # the data
+# Test boboche
+xgb_llm_s <- xgboost(
+  data = dmtrain_llm_s_full, # the data
   nround = 5000, # max number of boosting iterations
   objective = "multi:softprob", # the objective function 
   #eval_metric = "merror", # default train eval metric
@@ -89,28 +93,26 @@ xgb_n_s <- xgboost(
   verbose = 1
 )
 
+prob_llm_s <- predict(xgb_llm_s, dmvalid_llm_s_full)
+prob_llm_s_mat <- matrix(prob_llm_s, nrow = 5)
+prob_llm_s_mat <- t(prob_llm_s_mat)  # Transpose to align with rows
+pred_llm_s <- max.col(prob_llm_s_mat) - 1
 
-
-prob_n_s <- predict(xgb_n_s, dmvalid_ns_full)
-prob_n_s_mat <- matrix(prob_n_s, nrow = 5)
-prob_n_s_mat <- t(prob_n_s_mat)  # Transpose to align with rows
-pred_n_s <- max.col(prob_n_s_mat) - 1
-
-colnames(prob_n_s_mat) <- c("prob_rating_1", "prob_rating_2", "prob_rating_3", "prob_rating_4", "prob_rating_5")
-res_n_s <- bind_cols(
-  tibble("rating" = y_valid_n+1), 
+colnames(prob_llm_s_mat) <- c("prob_rating_1", "prob_rating_2", "prob_rating_3", "prob_rating_4", "prob_rating_5")
+res_llm_s <- bind_cols(
+  tibble("rating" = y_valid_llm+1), 
   "weighted_prediction" = NA, 
-  tibble("predicted_llm_rating" = pred_n_s+1), 
-  as_tibble(prob_n_s_mat)
+  tibble("predicted_llm_rating" = pred_llm_s+1), 
+  as_tibble(prob_llm_s_mat)
 )
 
-metrics_n_s <- compute_metrics(y_valid_n, pred_n_s)
+metrics_llm_s <- compute_metrics(y_valid_llm, pred_llm_s)
 
 
 
 
 
-test_results <- res_n_s %>% 
+test_results <- res_llm_s %>% 
   mutate(rating = factor(as.numeric(rating)),
          predicted_llm_rating = as.factor(as.numeric(predicted_llm_rating)),
          prob_rating_1 = as.numeric(prob_rating_1),
