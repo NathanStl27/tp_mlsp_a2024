@@ -264,20 +264,20 @@ xgb_llm_xgb_s_2 <- xgboost(
 )
 
 
-prob_llm_xgb_s_2 <- predict(xgb_llm_xgb_s_2, dmvalid2_llm_xgb_s_full)
+prob_llm_xgb_s_2 <- predict(xgb_llm_xgb_s_2, dmvalid_llm_s_full)
 prob_llm_xgb_s_2_mat <- matrix(prob_llm_xgb_s_2, nrow = 5)
 prob_llm_xgb_s_2_mat <- t(prob_llm_xgb_s_2_mat)  # Transpose to align with rows
 pred_llm_xgb_s_2 <- max.col(prob_llm_xgb_s_2_mat) - 1
 
 colnames(prob_llm_xgb_s_2_mat) <- c("prob_rating_1", "prob_rating_2", "prob_rating_3", "prob_rating_4", "prob_rating_5")
 res_llm_xgb_s_2 <- bind_cols(
-  tibble("rating" = y_valid_llm_xgb+1), 
+  tibble("rating" = y_valid_llm+1), 
   "weighted_prediction" = NA, 
   tibble("predicted_llm_rating" = pred_llm_xgb_s_2+1), 
   as_tibble(prob_llm_xgb_s_2_mat)
 )
 
-metrics_llm_xgb_s_2 <- compute_metrics(y_valid_llm_xgb, pred_llm_xgb_s_2)
+metrics_llm_xgb_s_2 <- compute_metrics(y_valid_llm, pred_llm_xgb_s_2)
 
 
 
