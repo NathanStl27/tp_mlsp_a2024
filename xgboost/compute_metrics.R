@@ -62,7 +62,7 @@ compute_metrics <- function(y_true, y_pred, itr=0){
   micro_prf <- (diag(s) / apply(s,1, sum))
   cat("micro-precision and recall : ", micro_prf)
   
-  cat("\n\n-- Random guess metrics --\n")
+  #cat("\n\n-- Random guess metrics --\n")
   # Random guess metrics
   rg <- (n / nc) * matrix(rep(p, nc), nc, nc, byrow=F)
   rgAccuracy <- 1 / nc
@@ -70,11 +70,11 @@ compute_metrics <- function(y_true, y_pred, itr=0){
   rgRecall <- 0*p + 1 / nc
   rgF1 <- 2 * p / (nc * p + 1)
   
-  print("Expected confusion matrix : \n")
+  #print("Expected confusion matrix : \n")
   print(rg)
-  cat("\nRG accuracy : ", rgAccuracy, "\n")
+  #cat("\nRG accuracy : ", rgAccuracy, "\n")
   rg_df <- data.frame("precision" = rgPrecision, "recall" = rgRecall, "f1-score" = rgF1)
-  print(rg_df)
+  #print(rg_df)
   
   res <- list(
     "itr" = itr,
@@ -82,9 +82,9 @@ compute_metrics <- function(y_true, y_pred, itr=0){
     "avg_acc" = avgAccuracy,
     "per_class" = pc_metrics,
     "macro" = macro,
-    "micro" = micro_prf,
-    "rg_acc" = rgAccuracy,
-    "rg_df" = rg_df
+    "micro" = micro_prf#,
+    #"rg_acc" = rgAccuracy,
+    #"rg_df" = rg_df
   )
   
   return(res)

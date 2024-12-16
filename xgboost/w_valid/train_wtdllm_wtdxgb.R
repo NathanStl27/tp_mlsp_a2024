@@ -19,17 +19,7 @@ data_full_llm_xgb_raw <- bind_rows(
   data_15000_20000_llm_xgb_raw
 )
 
-data_0_10000_llm_raw <- read.csv("data/CCO_0_10000_wtdllm_inference_train.csv")
-data_10000_15000_llm_raw <- read.csv("data/NSL_10000_15000_wtdllm_inference_train.csv")
-data_15000_20000_llm_raw <- read.csv("data/NSL_15000_20000_wtdllm_inference_train.csv")
-data_full_llm_raw <- bind_rows(
-  data_0_10000_llm_raw,  
-  data_10000_15000_llm_raw, 
-  data_15000_20000_llm_raw
-)
-
 #data_full_llm_xgb_raw %>% count(rating)
-#data_full_llm_raw %>% count(rating)
 
 ## Filtrer les valeurs extremes/aberrantes
 # Couper rating_number à 25K
@@ -46,20 +36,19 @@ data_full_llm_xgb <- data_full_llm_xgb_raw %>%
     verified_purchase = ifelse(verified_purchase, 1, 0)
   )
 
-data_full_llm <- data_full_llm_raw %>% 
-  mutate(
-    rating = rating-1, # ajustement pour algo xgboost
-    predicted_llm_rating = predicted_llm_rating-1,
-    verified_purchase = ifelse(verified_purchase, 1, 0)
-  )
-
 ## Normaliser les variables
 data_full_llm_xgb_scaled <- data_full_llm_xgb %>% 
   mutate(across(c(helpful_vote, average_rating, rating_number, price), ~rescale(.)))
 
-data_full_llm_scaled <- data_full_llm %>% 
-  mutate(across(c(helpful_vote, average_rating, rating_number, price), ~rescale(.)))
+## Train/Valid split
+set.seed(12345)
+val_ind <- sample(1:nrow(data_full_llm_xgb), 2500, replace = F)
 
+train_llm_xgb <- data_full_llm_xgb[-val_ind, ]
+valid_llm_xgb <- data_full_llm_xgb[val_ind, ]
+
+train_llm_xgb_scaled <- data_full_llm_xgb_scaled[-val_ind, ]
+valid_llm_xgb_scaled <- data_full_llm_xgb_scaled[val_ind, ]
 
 ## Sélection de variables
 vars2keep_1 <- c("as_image", "helpful_vote", "verified_purchase", "main_category",
@@ -71,12 +60,19 @@ vars2keep_2 <- c("as_image", "helpful_vote", "verified_purchase", "main_category
 
 ## Données pour XGB
 # n = normal, s = scaled, w = weighted
-X_train_llm_xgb_s_full <- data_full_llm_xgb_scaled %>% select(all_of(vars2keep_1))
-y_train_llm_xgb <- data_full_llm_xgb_scaled$rating
+X_train_llm_xgb_full <- train_llm_xgb %>% select(all_of(vars2keep_1))
+X_train_llm_xgb_s_full <- train_llm_xgb_scaled %>% select(all_of(vars2keep_1))
+y_train_llm_xgb <- train_llm_xgb$rating
+
+dmtrain_llm_xgb_full <- xgb.DMatrix(data = data.matrix(X_train_llm_xgb_full), label = y_train_llm_xgb)
 dmtrain_llm_xgb_s_full <- xgb.DMatrix(data = data.matrix(X_train_llm_xgb_s_full), label = y_train_llm_xgb)
 
-X_valid_llm_xgb_s_full <- data_full_llm_scaled %>% select(all_of(vars2keep_1))
-y_valid_llm_xgb <- data_full_llm_scaled$rating
+
+X_valid_llm_xgb_full <- valid_llm_xgb %>% select(all_of(vars2keep_1))
+X_valid_llm_xgb_s_full <- valid_llm_xgb_scaled %>% select(all_of(vars2keep_1))
+y_valid_llm_xgb <- valid_llm_xgb$rating
+
+dmvalid_llm_xgb_full <- xgb.DMatrix(data = data.matrix(X_valid_llm_xgb_full), label = y_valid_llm_xgb)
 dmvalid_llm_xgb_s_full <- xgb.DMatrix(data = data.matrix(X_valid_llm_xgb_s_full), label = y_valid_llm_xgb)
 
 
@@ -235,7 +231,7 @@ ggplot(avg_probabilities, aes(x = Predicted_Class, y = Average_Probability, fill
 
 
 
-#################### OLD -----------------------------------------------------------------
+
 ### XGBoost sur probs --------------------------------------------------------------------
 X_train2_llm_xgb_full <- train_llm_xgb %>% select(all_of(vars2keep_2))
 X_train2_llm_xgb_s_full <- train_llm_xgb_scaled %>% select(all_of(vars2keep_2))
