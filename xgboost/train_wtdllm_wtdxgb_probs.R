@@ -1,11 +1,11 @@
 ### XGBoost sur probs --------------------------------------------------------------------
 X_train2_llm_xgb_s_full <- data_full_llm_xgb_scaled %>% select(all_of(vars2keep_2))
 y_train2_llm_xgb <- data_full_llm_xgb_scaled$rating
-dmtrain2_llm_xgb_s_full <- xgb.DMatrix(data = data.matrix(X_train2_llm_xgb_s_full), label = y_train_llm_xgb)
+dmtrain2_llm_xgb_s_full <- xgb.DMatrix(data = data.matrix(X_train2_llm_xgb_s_full), label = y_train2_llm_xgb)
 
 X_valid2_llm_xgb_s_full <- data_full_llm_scaled %>% select(all_of(vars2keep_2))
 y_valid2_llm_xgb <- data_full_llm_scaled$rating
-dmvalid2_llm_xgb_s_full <- xgb.DMatrix(data = data.matrix(X_valid2_llm_xgb_s_full), label = y_valid_llm_xgb)
+dmvalid2_llm_xgb_s_full <- xgb.DMatrix(data = data.matrix(X_valid2_llm_xgb_s_full), label = y_valid2_llm_xgb)
 
 # Test boboche
 xgb_llm_xgb_s_3 <- xgboost(
@@ -24,9 +24,14 @@ xgb_llm_xgb_s_3 <- xgboost(
 
 
 prob_llm_xgb_s_3 <- predict(xgb_llm_xgb_s_3, dmvalid2_llm_xgb_s_full)
+
 prob_llm_xgb_s_3_mat <- matrix(prob_llm_xgb_s_3, nrow = 5)
 prob_llm_xgb_s_3_mat <- t(prob_llm_xgb_s_3_mat)  # Transpose to align with rows
 pred_llm_xgb_s_3 <- max.col(prob_llm_xgb_s_3_mat) - 1
+
+tib_res_llm_xgb_s_3 <- as_tibble(bind_cols(prob_llm_xgb_s_3_mat, y_valid2_llm_xgb+1))
+colnames(tib_res_llm_xgb_s_3) <- c("prob_rating_1", "prob_rating_2", "prob_rating_3", "prob_rating_4", "prob_rating_5", "true_label")
+#saveRDS(tib_res_llm_xgb_s_3, "data/pred_wtdllm_wtdxgb.rds")
 
 colnames(prob_llm_xgb_s_3_mat) <- c("prob_rating_1", "prob_rating_2", "prob_rating_3", "prob_rating_4", "prob_rating_5")
 res_llm_xgb_s_3 <- bind_cols(
