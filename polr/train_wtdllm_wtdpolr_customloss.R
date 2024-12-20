@@ -1,5 +1,5 @@
 #### Script pour entrainer le XGBoost sur les données de revues et de produits Amazon
-#### LLM entrainé sur equal weights et XGB entrainé sur données normales
+#### LLM entrainé sur equal weights avec custom loss et polr entrainé sur equal weights
 options(scipen = 999) # empêcher notation scientifique
 library(tidyverse)
 #library(MASS)
