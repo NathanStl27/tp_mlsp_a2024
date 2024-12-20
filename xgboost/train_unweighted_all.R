@@ -1,4 +1,5 @@
 #### Script pour entrainer le XGBoost sur les données de revues et de produits Amazon
+### LLM non balancé et XGB non balancé
 options(scipen = 999) # empêcher notation scientifique
 library(tidyverse)
 library(xgboost)
